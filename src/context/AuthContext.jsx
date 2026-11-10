@@ -35,11 +35,11 @@ export function AuthProvider({ children }) {
 
     const login = async (credentials) => {
         const { data } = await authService.login(credentials);
-        localStorage.setItem("token", data.token); // ajustar según tu respuesta
+        localStorage.setItem("token", data.jwt || data.token);
         await loadUser();
     };
 
-    const isAdmin = user?.role === "ADMIN"; // ajustar según tu respuesta
+    const isAdmin = user?.role === "ADMIN" || user?.role === "ADMINISTRATOR";
 
     return (
         <AuthContext.Provider value={{ user, loading, login, logout, isAdmin }}>
