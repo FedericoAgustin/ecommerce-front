@@ -32,7 +32,10 @@ export function CartProvider({ children }) {
     }, [refresh]);
 
     const addItem = async (productId, quantity = 1) => {
-        await cartService.addCartItem(productId, quantity);
+        if (!user?.id) {
+            throw new Error("Debes iniciar sesión para agregar productos al carrito.");
+        }
+        await cartService.addCartItem(user.id, productId, quantity);
         await refresh();
     };
 
@@ -46,11 +49,16 @@ export function CartProvider({ children }) {
         await refresh();
     };
 
+    const clear = async () => {
+        await cartService.clearCart();
+        await refresh();
+    };
+
     const count = cart.items.reduce((sum, i) => sum + i.quantity, 0);
 
     return (
         <CartContext.Provider
-            value={{ cart, count, loading, refresh, addItem, updateItem, removeItem }}
+            value={{ cart, count, loading, refresh, addItem, updateItem, removeItem, clear }}
         >
             {children}
         </CartContext.Provider>

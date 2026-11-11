@@ -1,8 +1,11 @@
 import api from "./client";
 
 export const getCart = () => api.get("/cart");
-export const addCartItem = (productId, quantity = 1) =>
-    api.post("/cart/items", { productId, quantity });
-export const updateCartItem = (itemId, quantity) =>
-    api.put(`/cart/items/${itemId}`, { quantity });
-export const removeCartItem = (itemId) => api.delete(`/cart/items/${itemId}`);
+export const addCartItem = (userId, productId, quantity = 1) =>
+    api.post(`/cart/add/${userId}`, { productId, quantity });
+export const updateCartItem = (cartItemId, quantity) =>
+    api.put(`/cart/item/${cartItemId}?quantity=${quantity}`);
+export const removeCartItem = (cartItemId) =>
+    api.delete(`/cart/item/${cartItemId}`);
+export const clearCart = () =>
+    api.delete("/cart/clear");

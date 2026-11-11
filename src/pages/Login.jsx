@@ -16,6 +16,11 @@ export default function Login() {
     const handleChange = (e) =>
         setForm({ ...form, [e.target.name]: e.target.value });
 
+    const setDemoCredentials = (email, password) => {
+        setForm({ email, password });
+        setError("");
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
@@ -38,10 +43,10 @@ export default function Login() {
     };
 
     return (
-        <div className="card" style={{ maxWidth: 380, margin: "80px auto" }}>
+        <div className="card" style={{ maxWidth: 400, margin: "60px auto" }}>
             <h2 style={{ margin: "0 0 4px", fontSize: 20 }}>Iniciar sesión</h2>
             <p style={{ margin: "0 0 20px", fontSize: 14, color: "var(--muted)" }}>
-                Accede a tu cuenta
+                Accede a tu cuenta de EasyCommerce
             </p>
 
             <form onSubmit={handleSubmit}>
@@ -59,6 +64,7 @@ export default function Login() {
                     label="Contraseña"
                     name="password"
                     type="password"
+                    placeholder="••••••••"
                     value={form.password}
                     onChange={handleChange}
                     required
@@ -71,12 +77,36 @@ export default function Login() {
                 )}
 
                 <button className="btn" style={{ width: "100%" }} disabled={submitting}>
-                    {submitting ? "Entrando..." : "Entrar"}
+                    {submitting ? "Iniciando sesión..." : "Entrar"}
                 </button>
             </form>
 
-            <p style={{ fontSize: 13, color: "var(--muted)", textAlign: "center", margin: "16px 0 0" }}>
-                ¿No tienes cuenta? <Link to="/register" style={{ color: "var(--text)", textDecoration: "underline" }}>Regístrate</Link>
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+                <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--muted)", textAlign: "center" }}>
+                    Credenciales de prueba preconfiguradas:
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                        type="button"
+                        className="btn secondary"
+                        style={{ flex: 1, fontSize: 12, padding: "6px 8px" }}
+                        onClick={() => setDemoCredentials("user@test.com", "user123")}
+                    >
+                        👤 Usuario
+                    </button>
+                    <button
+                        type="button"
+                        className="btn secondary"
+                        style={{ flex: 1, fontSize: 12, padding: "6px 8px" }}
+                        onClick={() => setDemoCredentials("admin@test.com", "admin123")}
+                    >
+                        🛡️ Administrador
+                    </button>
+                </div>
+            </div>
+
+            <p style={{ margin: "18px 0 0", fontSize: 13, color: "var(--muted)", textAlign: "center" }}>
+                ¿No tienes cuenta? <Link to="/register" style={{ textDecoration: "underline", color: "var(--text)" }}>Regístrate aquí</Link>
             </p>
         </div>
     );
