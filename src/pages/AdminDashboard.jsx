@@ -132,7 +132,7 @@ export default function AdminDashboard() {
                 description: productForm.description,
                 price: parseFloat(productForm.price),
                 stock: parseInt(productForm.stock, 10),
-                categoryId: parseInt(productForm.categoryId, 10),
+                idCategory: parseInt(productForm.categoryId, 10),
                 imageUrl: productForm.imageUrl || null,
             };
 
@@ -308,7 +308,7 @@ export default function AdminDashboard() {
                                                 )}
                                             </td>
                                             <td>
-                                                <span className="tag">{p.category?.name || "Sin categoría"}</span>
+                                                <span className="tag">{p.categoryName || "Sin categoría"}</span>
                                             </td>
                                             <td style={{ textAlign: "right" }}>{money(p.price)}</td>
                                             <td style={{ textAlign: "center" }}>
