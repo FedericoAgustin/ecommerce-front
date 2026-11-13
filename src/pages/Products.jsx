@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { getProducts } from "../api/productService";
 import { getCategories } from "../api/categoryService";
 import ProductCard from "../components/ProductCard";
@@ -11,47 +11,58 @@ export default function Products() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [totalElements, setTotalElements] = useState(0);
 
     useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    useEffect(() => {
         let cancelled = false;
-        async function load() {
+        getCategories()
+            .then(({ data }) => {
+                if (!cancelled) setCategories(Array.isArray(data) ? data : (data?.content ?? []));
+            })
+            .catch((err) => console.error("Error al cargar categorías", err));
+        return () => { cancelled = true; };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadProducts() {
             setLoading(true);
+            setError("");
             try {
-                const [p, c] = await Promise.all([getProducts(page, 20), getCategories()]);
+                const { data } = await getProducts(page, 20, selectedCategory, debouncedSearch);
                 if (cancelled) return;
-                const productList = Array.isArray(p.data) ? p.data : (p.data?.content || []);
-                const categoryList = Array.isArray(c.data) ? c.data : (c.data?.content || []);
-                setProducts(productList);
-                setCategories(categoryList);
-                if (p.data && !Array.isArray(p.data)) {
-                    setTotalPages(p.data.totalPages ?? 1);
-                    setTotalElements(p.data.totalElements ?? productList.length);
-                } else {
-                    setTotalPages(1);
-                    setTotalElements(productList.length);
-                }
-            } catch {
-                if (!cancelled) setError("No se pudieron cargar los productos.");
+                const list = Array.isArray(data) ? data : (data?.content ?? []);
+                setProducts(list);
+                setTotalPages(Array.isArray(data) ? 1 : (data?.totalPages ?? 1));
+                setTotalElements(Array.isArray(data) ? list.length : (data?.totalElements ?? list.length));
+            } catch (err) {
+                if (cancelled) return;
+                console.error("Error al cargar productos", err);
+                setProducts([]);
+                setTotalPages(1);
+                setTotalElements(0);
+                setError("No se pudieron cargar los productos.");
             } finally {
                 if (!cancelled) setLoading(false);
             }
         }
-        load();
+        loadProducts();
         return () => { cancelled = true; };
-    }, [page]);
+    }, [page, selectedCategory, debouncedSearch]);
 
-    const filtered = useMemo(() => {
-        const term = search.trim().toLowerCase();
-        return products.filter((p) => {
-            const matchesText = !term || p.name.toLowerCase().includes(term);
-            const matchesCategory = !selectedCategory || p.category?.id === selectedCategory;
-            return matchesText && matchesCategory;
-        });
-    }, [products, search, selectedCategory]);
+    const selectCategory = (id) => {
+        setSelectedCategory(id);
+        setPage(0);
+    };
 
     return (
         <div>
@@ -59,9 +70,7 @@ export default function Products() {
                 <div>
                     <h1>Productos</h1>
                     {!loading && !error && (
-                        <p>
-                            {totalElements > 0 ? `${totalElements} productos en catálogo (Página ${page + 1} de ${totalPages})` : `${filtered.length} productos`}
-                        </p>
+                        <p>{totalElements} productos encontrados (Página {page + 1} de {totalPages})</p>
                     )}
                 </div>
             </div>
@@ -71,21 +80,19 @@ export default function Products() {
                     type="search"
                     placeholder="Buscar producto..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setSearch(e.target.value); setPage(0); }}
                     style={{ flex: "1 1 240px", maxWidth: 360 }}
                 />
                 <CategoryChips
                     categories={categories}
                     selected={selectedCategory}
-                    onSelect={setSelectedCategory}
+                    onSelect={selectCategory}
                 />
             </div>
 
             {loading && (
                 <div className="product-grid">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <ProductSkeleton key={i} />
-                    ))}
+                    {Array.from({ length: 6 }).map((_, i) => <ProductSkeleton key={i} />)}
                 </div>
             )}
 
@@ -93,22 +100,18 @@ export default function Products() {
                 <div className="empty-state">
                     <p>{error}</p>
                     <p style={{ fontSize: 13, color: "var(--muted)" }}>
-                        Debes iniciar sesión para consultar el catálogo o revisar que el backend esté activo.
+                        Revisá la conexión con el backend o tu sesión de usuario.
                     </p>
                 </div>
             )}
 
-            {!loading && !error && filtered.length === 0 && (
-                <div className="empty-state">
-                    <p>No se encontraron productos en esta página.</p>
-                </div>
+            {!loading && !error && products.length === 0 && (
+                <div className="empty-state"><p>No se encontraron productos.</p></div>
             )}
 
-            {!loading && !error && filtered.length > 0 && (
+            {!loading && !error && products.length > 0 && (
                 <div className="product-grid">
-                    {filtered.map((product) => (
-                        <ProductCard key={product.id} product={product} />
-                    ))}
+                    {products.map((product) => <ProductCard key={product.id} product={product} />)}
                 </div>
             )}
 
@@ -122,9 +125,7 @@ export default function Products() {
                             window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
                         style={{ cursor: page === 0 ? "not-allowed" : "pointer", opacity: page === 0 ? 0.5 : 1 }}
-                    >
-                        ← Anterior
-                    </button>
+                    >← Anterior</button>
                     <span style={{ fontSize: 14, color: "var(--muted)", fontWeight: 500 }}>
                         Página {page + 1} de {totalPages}
                     </span>
@@ -136,9 +137,7 @@ export default function Products() {
                             window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
                         style={{ cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", opacity: page >= totalPages - 1 ? 0.5 : 1 }}
-                    >
-                        Siguiente →
-                    </button>
+                    >Siguiente →</button>
                 </div>
             )}
         </div>

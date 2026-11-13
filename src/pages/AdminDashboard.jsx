@@ -12,6 +12,9 @@ export default function AdminDashboard() {
 
     // --- State: Products ---
     const [products, setProducts] = useState([]);
+    const [productPage, setProductPage] = useState(0);
+    const [productTotalElements, setProductTotalElements] = useState(0);
+    const [productTotalPages, setProductTotalPages] = useState(1);
     const [categories, setCategories] = useState([]);
     const [loadingProducts, setLoadingProducts] = useState(false);
     const [productModal, setProductModal] = useState(false);
@@ -33,6 +36,10 @@ export default function AdminDashboard() {
 
     // --- State: Orders ---
     const [orders, setOrders] = useState([]);
+    const [orderPage, setOrderPage] = useState(0);
+    const [orderTotalElements, setOrderTotalElements] = useState(null);
+    const [orderTotalPages, setOrderTotalPages] = useState(1);
+    const [ordersError, setOrdersError] = useState("");
     const [loadingOrders, setLoadingOrders] = useState(false);
     const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
@@ -55,9 +62,11 @@ export default function AdminDashboard() {
     const loadProducts = async () => {
         setLoadingProducts(true);
         try {
-            const { data } = await getProducts(0, 100);
-            const list = Array.isArray(data) ? data : (data?.content || []);
+            const { data } = await getProducts(productPage, 100);
+            const list = Array.isArray(data) ? data : (data?.content ?? []);
             setProducts(list);
+            setProductTotalElements(Array.isArray(data) ? list.length : (data?.totalElements ?? list.length));
+            setProductTotalPages(Array.isArray(data) ? 1 : (data?.totalPages ?? 1));
         } catch {
             showError("No se pudieron cargar los productos.");
         } finally {
@@ -80,12 +89,19 @@ export default function AdminDashboard() {
 
     const loadOrders = async () => {
         setLoadingOrders(true);
+        setOrdersError("");
         try {
-            const { data } = await getAllOrdersAdmin();
-            const list = Array.isArray(data) ? data : (data?.content || []);
-            setOrders(list.map(normalizeOrder).sort((a, b) => b.id - a.id));
-        } catch {
-            showError("No se pudieron cargar los pedidos de clientes.");
+            const { data } = await getAllOrdersAdmin(orderPage, 20);
+            if (!Array.isArray(data?.content)) {
+                throw new Error("La API administrativa no devolvió una página de pedidos");
+            }
+            setOrders(data.content.map(normalizeOrder));
+            setOrderTotalElements(data.totalElements ?? data.content.length);
+            setOrderTotalPages(Math.max(1, data.totalPages ?? 1));
+        } catch (err) {
+            console.error("Error al cargar pedidos administrativos:", err);
+            setOrdersError("No se pudieron cargar los pedidos. Verificá la API administrativa.");
+            setOrders([]);
         } finally {
             setLoadingOrders(false);
         }
@@ -93,9 +109,18 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         loadCategories();
-        loadProducts();
-        loadOrders();
     }, []);
+
+    useEffect(() => {
+        loadProducts();
+    }, [productPage]);
+
+    // Cargar los pedidos solo al visitar su pestaña o cambiar de página.
+    useEffect(() => {
+        if (tab === "orders") {
+            loadOrders();
+        }
+    }, [tab, orderPage]);
 
     // --- Handlers: Products ---
     const openNewProduct = () => {
@@ -250,7 +275,7 @@ export default function AdminDashboard() {
                     style={{ borderRadius: "8px 8px 0 0", borderBottom: "none" }}
                     onClick={() => setTab("products")}
                 >
-                    📦 Productos ({products.length})
+                    📦 Productos ({productTotalElements.toLocaleString("es-AR")})
                 </button>
                 <button
                     className={`btn ${tab === "categories" ? "" : "secondary"}`}
@@ -264,7 +289,7 @@ export default function AdminDashboard() {
                     style={{ borderRadius: "8px 8px 0 0", borderBottom: "none" }}
                     onClick={() => setTab("orders")}
                 >
-                    🚚 Pedidos de Clientes ({orders.length})
+                    🚚 Pedidos de Clientes{orderTotalElements === null ? "" : ` (${orderTotalElements.toLocaleString("es-AR")})`}
                 </button>
             </div>
 
@@ -341,6 +366,25 @@ export default function AdminDashboard() {
                             </table>
                         </div>
                     )}
+                    {productTotalPages > 1 && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, margin: "20px 0" }}>
+                            <button
+                                className="btn secondary"
+                                disabled={loadingProducts || productPage === 0}
+                                onClick={() => setProductPage((prev) => Math.max(0, prev - 1))}
+                            >
+                                ← Anterior
+                            </button>
+                            <span>Página {productPage + 1} de {productTotalPages}</span>
+                            <button
+                                className="btn secondary"
+                                disabled={loadingProducts || productPage >= productTotalPages - 1}
+                                onClick={() => setProductPage((prev) => Math.min(productTotalPages - 1, prev + 1))}
+                            >
+                                Siguiente →
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -405,12 +449,18 @@ export default function AdminDashboard() {
                 <div>
                     <div style={{ marginBottom: 16 }}>
                         <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>
-                            Listado completo de órdenes y despacho logístico
+                            Listado paginado de órdenes y despacho logístico
+                            {orderTotalElements !== null && ` · Total: ${orderTotalElements.toLocaleString("es-AR")}`}
                         </p>
                     </div>
 
                     {loadingOrders ? (
                         <p style={{ color: "var(--muted)" }}>Cargando pedidos...</p>
+                    ) : ordersError ? (
+                        <div className="empty">
+                            <h3>{ordersError}</h3>
+                            <button className="btn secondary" onClick={loadOrders}>Reintentar</button>
+                        </div>
                     ) : orders.length === 0 ? (
                         <div className="empty">
                             <h3>No hay pedidos registrados aún</h3>
@@ -477,6 +527,25 @@ export default function AdminDashboard() {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+                    {!loadingOrders && !ordersError && orderTotalPages > 1 && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, margin: "20px 0" }}>
+                            <button
+                                className="btn secondary"
+                                disabled={orderPage === 0 || updatingOrderId !== null}
+                                onClick={() => setOrderPage((prev) => Math.max(0, prev - 1))}
+                            >
+                                ← Anterior
+                            </button>
+                            <span>Página {orderPage + 1} de {orderTotalPages.toLocaleString("es-AR")}</span>
+                            <button
+                                className="btn secondary"
+                                disabled={orderPage >= orderTotalPages - 1 || updatingOrderId !== null}
+                                onClick={() => setOrderPage((prev) => Math.min(orderTotalPages - 1, prev + 1))}
+                            >
+                                Siguiente →
+                            </button>
                         </div>
                     )}
                 </div>
